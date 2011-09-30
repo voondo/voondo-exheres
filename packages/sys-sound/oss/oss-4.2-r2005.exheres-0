@@ -1,0 +1,70 @@
+# Copyright 2011 Romain Lalaut <romain.lalaut@laposte.net>
+# Distributed under the terms of the GNU General Public License v2
+
+require systemd-service
+
+MY_PV="v${PV}-build${PR:1}"
+
+SUMMARY="An interface for making and capturing sound"
+HOMEPAGE="http://www.opensound.com/"
+DOWNLOADS="http://www.4front-tech.com/developer/sources/stable/gpl/${PN}-${MY_PV}-src-gpl.tar.bz2"
+
+LICENCES="GPL-2"
+SLOT="0"
+PLATFORMS="~amd64"
+
+DEPENDENCIES="
+    build+run:
+        x11-libs/gtk+:2
+"
+
+WORK=${WORKBASE}/${PN}-${MY_PV}-src-gpl
+
+src_prepare() {
+    default
+    
+    edo sed -i "s/ -Werror//" ./setup/srcconf_linux.inc
+#     edo sed -i -e "s:-lcrypto:$(pkg-config --libs openssl):" configure.ac
+}
+
+src_configure() {
+    edo mkdir build
+    edo pushd build
+    ../configure --regparm
+    edo popd
+}
+
+src_compile() {
+    default
+    
+    edo pushd build/oss/lib
+    edo ${CC} -fPIC -shared -O2 -Wall -lssl flashsupport.c -o libflashsupport.so
+    edo popd
+}
+
+src_install() {
+    edo pushd build
+    emake build
+    edo pushd prototype
+    
+    edo rmdir usr/lib/oss/modules.noregparm
+    edo rmdir usr/lib/oss/objects.noregparm
+    
+    edo pushd usr
+    if [[ ${LIBDIR} != lib ]] ; then
+    edo mv lib ${LIBDIR}
+    fi
+    edo popd
+    
+    edo mv * ${IMAGE}
+    edo popd
+    
+    edo mv oss/lib/libflashsupport.so ${IMAGE}/usr/${LIBDIR}
+    
+    edo popd
+    
+    
+    keepdir /usr/${LIBDIR}/oss/save
+    
+    install_systemd_files   
+}
